@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { enrichWithReverseGeocode, saveLocation } from "@/lib/location-storage";
+import { useLoading } from "./LoadingProvider";
 
 /**
  * Поиск места: ввод с автодополнением + кнопка геолокации браузера.
@@ -12,6 +13,7 @@ export function LocationPicker({ current }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  const { startLoading } = useLoading();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -75,7 +77,7 @@ export function LocationPicker({ current }) {
     else params.delete("admin1");
     if (loc.timezone) params.set("tz", loc.timezone);
     else params.delete("tz");
-    router.push(`${pathname}?${params.toString()}`);
+    startLoading(() => router.push(`${pathname}?${params.toString()}`));
     setQuery("");
     setResults([]);
     setOpen(false);

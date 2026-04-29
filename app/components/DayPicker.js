@@ -1,6 +1,8 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useDebouncedNavigate } from "./LoadingProvider";
 
 const MONTHS = [
   "январь", "февраль", "март", "апрель", "май", "июнь",
@@ -15,19 +17,27 @@ const MIN_YEAR = 1979;
 /**
  * Выбор «месяц + день» и диапазона годов для режима «один день в разные годы».
  * Параметры пишутся в URL (month, day, from, to) и страница перерендеривается на сервере.
+ *
+ * Селекты (month/day) пушат сразу, инпуты годов — через debounce.
  */
 export function DayPicker({ month, day, fromYear, toYear }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const navigate = useDebouncedNavigate(300);
   const currentYear = new Date().getUTCFullYear();
 
-  function update(patch) {
+  // Локальный state для инпутов годов — иначе ввод залипает пока крутится debounce.
+  const [localFrom, setLocalFrom] = useState(fromYear ?? MIN_YEAR);
+  const [localTo, setLocalTo] = useState(toYear ?? currentYear);
+  useEffect(() => setLocalFrom(fromYear ?? MIN_YEAR), [fromYear]);
+  useEffect(() => setLocalTo(toYear ?? currentYear), [toYear]);
+
+  function buildUrl(patch) {
     const params = new URLSearchParams(searchParams.toString());
     for (const [k, v] of Object.entries(patch)) {
       if (v == null || v === "") params.delete(k);
       else params.set(k, String(v));
     }
-    router.push(`/this-day?${params.toString()}`);
+    return `/this-day?${params.toString()}`;
   }
 
   const maxDay = DAYS_IN_MONTH[(month ?? 1) - 1];
@@ -42,7 +52,7 @@ export function DayPicker({ month, day, fromYear, toYear }) {
           onChange={(e) => {
             const m = Number(e.target.value);
             const newMax = DAYS_IN_MONTH[m - 1];
-            update({ month: m, day: Math.min(day ?? 1, newMax) });
+            navigate(buildUrl({ month: m, day: Math.min(day ?? 1, newMax) }), { immediate: true });
           }}
           className="px-3 py-2 rounded-lg bg-surface border border-stroke backdrop-blur
                      text-fg focus:outline-none focus:ring-2 focus:ring-sky-400/60 transition
@@ -60,7 +70,7 @@ export function DayPicker({ month, day, fromYear, toYear }) {
         <span className="text-fg-muted">День</span>
         <select
           value={safeDay}
-          onChange={(e) => update({ day: Number(e.target.value) })}
+          onChange={(e) => navigate(buildUrl({ day: Number(e.target.value) }), { immediate: true })}
           className="px-3 py-2 rounded-lg bg-surface border border-stroke backdrop-blur
                      text-fg focus:outline-none focus:ring-2 focus:ring-sky-400/60 transition
                      [&>option]:bg-bg-deep [&>option]:text-fg"
@@ -80,10 +90,11 @@ export function DayPicker({ month, day, fromYear, toYear }) {
             type="number"
             min={MIN_YEAR}
             max={currentYear}
-            value={fromYear ?? MIN_YEAR}
+            value={localFrom}
             onChange={(e) => {
               const v = clamp(Number(e.target.value), MIN_YEAR, currentYear);
-              update({ from: v });
+              setLocalFrom(v);
+              navigate(buildUrl({ from: v }));
             }}
             className="w-24 px-3 py-2 rounded-lg bg-surface border border-stroke backdrop-blur
                        text-fg tabular-nums
@@ -94,10 +105,11 @@ export function DayPicker({ month, day, fromYear, toYear }) {
             type="number"
             min={MIN_YEAR}
             max={currentYear}
-            value={toYear ?? currentYear}
+            value={localTo}
             onChange={(e) => {
               const v = clamp(Number(e.target.value), MIN_YEAR, currentYear);
-              update({ to: v });
+              setLocalTo(v);
+              navigate(buildUrl({ to: v }));
             }}
             className="w-24 px-3 py-2 rounded-lg bg-surface border border-stroke backdrop-blur
                        text-fg tabular-nums
@@ -107,13 +119,13 @@ export function DayPicker({ month, day, fromYear, toYear }) {
       </div>
 
       <div className="flex flex-wrap gap-1.5 ml-0 sm:ml-2">
-        <PresetButton onClick={() => update({ from: MIN_YEAR, to: currentYear })}>
+        <PresetButton onClick={() => navigate(buildUrl({ from: MIN_YEAR, to: currentYear }), { immediate: true })}>
           С 1979
         </PresetButton>
-        <PresetButton onClick={() => update({ from: 2000, to: currentYear })}>
+        <PresetButton onClick={() => navigate(buildUrl({ from: 2000, to: currentYear }), { immediate: true })}>
           С 2000
         </PresetButton>
-        <PresetButton onClick={() => update({ from: currentYear - 9, to: currentYear })}>
+        <PresetButton onClick={() => navigate(buildUrl({ from: currentYear - 9, to: currentYear }), { immediate: true })}>
           10 лет
         </PresetButton>
       </div>

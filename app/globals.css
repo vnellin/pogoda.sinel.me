@@ -109,3 +109,10 @@ body {
 .dark input[type="number"] {
   color-scheme: dark;
 }
+
+/* Анимация для TopProgress — бегущая «змейка» по верху страницы. */
+@keyframes pogoda-top-progress {
+  0%   { transform: translateX(-100%); }
+  50%  { transform: translateX(150%); }
+  100% { transform: translateX(400%); }
+}

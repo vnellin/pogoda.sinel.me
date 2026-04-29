@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Nav } from "./components/Nav";
+import { LoadingProvider } from "./components/LoadingProvider";
+import { TopProgress } from "./components/TopProgress";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -50,10 +52,13 @@ export default function RootLayout({ children }) {
           <div className="absolute -top-40 -left-40 w-[40rem] h-[40rem] rounded-full bg-aura-1 blur-3xl" />
           <div className="absolute -bottom-40 -right-40 w-[40rem] h-[40rem] rounded-full bg-aura-2 blur-3xl" />
         </div>
-        <Suspense fallback={null}>
-          <Nav />
-        </Suspense>
-        {children}
+        <LoadingProvider>
+          <TopProgress />
+          <Suspense fallback={null}>
+            <Nav />
+          </Suspense>
+          {children}
+        </LoadingProvider>
       </body>
     </html>
   );

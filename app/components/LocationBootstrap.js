@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { enrichWithReverseGeocode, loadLocation } from "@/lib/location-storage";
+import { useLoading } from "./LoadingProvider";
 
 // Что показывать когда у пользователя нет ?lat=&lon= в URL:
 // 1) если в localStorage есть последняя локация — редиректим на неё
@@ -12,6 +13,7 @@ import { enrichWithReverseGeocode, loadLocation } from "@/lib/location-storage";
 export function LocationBootstrap() {
   const router = useRouter();
   const pathname = usePathname();
+  const { startLoading } = useLoading();
   // 'init' — пока useEffect не отработал; 'requesting' — спрашиваем geolocation;
   // 'failed' — нет ни сохранённой, ни геолокации (показываем EmptyState)
   const [status, setStatus] = useState("init");
@@ -57,7 +59,7 @@ export function LocationBootstrap() {
     if (loc.country) params.set("country", loc.country);
     if (loc.admin1) params.set("admin1", loc.admin1);
     if (loc.timezone) params.set("tz", loc.timezone);
-    router.replace(`${pathname}?${params.toString()}`);
+    startLoading(() => router.replace(`${pathname}?${params.toString()}`));
   }
 
   if (status === "requesting") {

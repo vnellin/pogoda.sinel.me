@@ -1,38 +1,56 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useDebouncedNavigate } from "./LoadingProvider";
 
 const MIN_DATE = "1979-01-01";
 
 /**
  * Выбор диапазона дат + быстрые пресеты.
  * Границы: с 1979-01-01 до сегодня + 4 дня (спец требование проекта).
+ *
+ * Поведение:
+ * - инпуты редактируются через локальный state (отзывчиво даже при медленной сети)
+ * - после 300мс без правок навигация запускается через useDebouncedNavigate
+ * - пресеты пушат сразу (immediate)
  */
 export function DateRangePicker({ start, end }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const navigate = useDebouncedNavigate(300);
 
   const today = todayUTC();
   const maxDate = formatISO(addDays(today, 4));
 
-  function update(nextStart, nextEnd) {
-    // если пользователь поставил end < start — поменяем местами
-    let s = nextStart;
-    let e = nextEnd;
+  // Локальный state — чтобы инпут показывал то, что только что ввёл пользователь,
+  // не дожидаясь пока URL и пропсы обновятся.
+  const [localStart, setLocalStart] = useState(start ?? "");
+  const [localEnd, setLocalEnd] = useState(end ?? "");
+
+  // Синхронизация при внешнем изменении (пресет / переход назад/вперёд).
+  useEffect(() => setLocalStart(start ?? ""), [start]);
+  useEffect(() => setLocalEnd(end ?? ""), [end]);
+
+  function buildUrl(s, e) {
     if (s && e && s > e) [s, e] = [e, s];
     const params = new URLSearchParams(searchParams.toString());
     if (s) params.set("start", s); else params.delete("start");
     if (e) params.set("end", e); else params.delete("end");
-    router.push(`/?${params.toString()}`);
+    return `/?${params.toString()}`;
   }
 
   function applyPreset(preset) {
     const t = formatISO(today);
-    if (preset === "today") update(t, t);
-    else if (preset === "next4") update(t, formatISO(addDays(today, 4)));
-    else if (preset === "week") update(formatISO(addDays(today, -6)), t);
-    else if (preset === "month") update(formatISO(addDays(today, -29)), t);
-    else if (preset === "year") update(formatISO(addDays(today, -364)), t);
+    let s, e;
+    if (preset === "today") [s, e] = [t, t];
+    else if (preset === "next4") [s, e] = [t, formatISO(addDays(today, 4))];
+    else if (preset === "week") [s, e] = [formatISO(addDays(today, -6)), t];
+    else if (preset === "month") [s, e] = [formatISO(addDays(today, -29)), t];
+    else if (preset === "year") [s, e] = [formatISO(addDays(today, -364)), t];
+    else return;
+    setLocalStart(s);
+    setLocalEnd(e);
+    navigate(buildUrl(s, e), { immediate: true });
   }
 
   return (
@@ -41,10 +59,14 @@ export function DateRangePicker({ start, end }) {
         <span className="text-fg-muted">С</span>
         <input
           type="date"
-          value={start ?? ""}
+          value={localStart}
           min={MIN_DATE}
           max={maxDate}
-          onChange={(e) => update(e.target.value, end)}
+          onChange={(e) => {
+            const v = e.target.value;
+            setLocalStart(v);
+            navigate(buildUrl(v, localEnd));
+          }}
           className="px-3 py-2 rounded-lg bg-surface border border-stroke backdrop-blur
                      text-fg focus:outline-none focus:ring-2 focus:ring-sky-400/60 transition"
         />
@@ -53,10 +75,14 @@ export function DateRangePicker({ start, end }) {
         <span className="text-fg-muted">По</span>
         <input
           type="date"
-          value={end ?? ""}
+          value={localEnd}
           min={MIN_DATE}
           max={maxDate}
-          onChange={(e) => update(start, e.target.value)}
+          onChange={(e) => {
+            const v = e.target.value;
+            setLocalEnd(v);
+            navigate(buildUrl(localStart, v));
+          }}
           className="px-3 py-2 rounded-lg bg-surface border border-stroke backdrop-blur
                      text-fg focus:outline-none focus:ring-2 focus:ring-sky-400/60 transition"
         />
