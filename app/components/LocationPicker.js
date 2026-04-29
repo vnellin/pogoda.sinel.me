@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { enrichWithReverseGeocode, saveLocation } from "@/lib/location-storage";
 
 /**
  * Поиск места: ввод с автодополнением + кнопка геолокации браузера.
@@ -16,8 +17,15 @@ export function LocationPicker({ current }) {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [geoError, setGeoError] = useState(null);
+  const [geoLoading, setGeoLoading] = useState(false);
   const containerRef = useRef(null);
   const abortRef = useRef(null);
+
+  // Сохраняем текущую выбранную локацию — при следующем заходе LocationBootstrap
+  // подхватит её из localStorage и сделает редирект сам.
+  useEffect(() => {
+    if (current) saveLocation(current);
+  }, [current]);
 
   // Debounced поиск через /api/search
   useEffect(() => {
@@ -75,17 +83,24 @@ export function LocationPicker({ current }) {
   }
 
   function useGeolocation() {
+    if (geoLoading) return; // защита от повторных кликов
     setGeoError(null);
     if (!navigator.geolocation) {
       setGeoError("Геолокация недоступна в этом браузере");
       return;
     }
+    setGeoLoading(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        selectLocation({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        });
+      async (pos) => {
+        try {
+          const loc = await enrichWithReverseGeocode(
+            pos.coords.latitude,
+            pos.coords.longitude,
+          );
+          selectLocation(loc);
+        } finally {
+          setGeoLoading(false);
+        }
       },
       (err) => {
         const messages = {
@@ -94,6 +109,7 @@ export function LocationPicker({ current }) {
           3: "Превышено время ожидания",
         };
         setGeoError(messages[err.code] ?? "Ошибка геолокации");
+        setGeoLoading(false);
       },
       { enableHighAccuracy: false, timeout: 8000 },
     );
@@ -138,12 +154,25 @@ export function LocationPicker({ current }) {
         <button
           type="button"
           onClick={useGeolocation}
+          disabled={geoLoading}
+          aria-busy={geoLoading}
           className="px-4 py-3 rounded-xl bg-surface border border-stroke backdrop-blur
-                     hover:bg-surface-strong transition text-sm whitespace-nowrap"
+                     hover:bg-surface-strong transition text-sm whitespace-nowrap
+                     disabled:opacity-60 disabled:cursor-wait disabled:hover:bg-surface
+                     inline-flex items-center gap-2"
           title="Использовать моё местоположение"
         >
-          <span aria-hidden>📍</span>
-          <span className="ml-2 hidden sm:inline">Моё место</span>
+          {geoLoading ? (
+            <span
+              className="inline-block w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"
+              aria-hidden
+            />
+          ) : (
+            <span aria-hidden>📍</span>
+          )}
+          <span className="hidden sm:inline">
+            {geoLoading ? "Определяю…" : "Моё место"}
+          </span>
         </button>
       </div>
 

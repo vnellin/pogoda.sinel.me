@@ -6,6 +6,15 @@ import { getDayAcrossYears } from "@/lib/weather-service";
 
 const MIN_YEAR = 1979;
 
+// Динамический <title>: если выбрано место — "«Этот день» в Москве — Погода",
+// иначе — дефолтный заголовок из layout.
+export async function generateMetadata({ searchParams }) {
+  const sp = await searchParams;
+  const parsed = parseParams(sp);
+  const name = parsed.location?.name;
+  return name ? { title: `«Этот день» в ${name}` } : { title: "«Этот день» в разные годы" };
+}
+
 export default async function ThisDayPage({ searchParams }) {
   const sp = await searchParams;
   const parsed = parseParams(sp);

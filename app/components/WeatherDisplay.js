@@ -1,5 +1,6 @@
 // Server Component (без 'use client'): получает уже загруженные часы и рисует UI.
 import { weatherInfo, dominantCode } from "@/lib/weather-codes";
+import { DynamicFavicon } from "./DynamicFavicon";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -13,11 +14,13 @@ export function WeatherDisplay({ hours, location, startDate, endDate }) {
   }
 
   const snapshot = pickSnapshot(hours);
+  const snapshotInfo = weatherInfo(snapshot.weatherCode);
   const days = groupByDay(hours);
   const isMultiDay = days.length > 1;
 
   return (
     <div className="space-y-6">
+      <DynamicFavicon emoji={snapshotInfo.emoji} />
       <HeroCard hour={snapshot} location={location} startDate={startDate} endDate={endDate} />
       <TemperatureChart hours={hours} />
       {isMultiDay && <DailyCards days={days} />}

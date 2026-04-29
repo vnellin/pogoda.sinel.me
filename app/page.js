@@ -2,10 +2,20 @@ import { Suspense } from "react";
 import { LocationPicker } from "./components/LocationPicker";
 import { DateRangePicker } from "./components/DateRangePicker";
 import { WeatherDisplay } from "./components/WeatherDisplay";
+import { LocationBootstrap } from "./components/LocationBootstrap";
 import { getWeather } from "@/lib/weather-service";
 
 const MIN_DATE = "1979-01-01";
 const MAX_FORECAST_DAYS = 4;
+
+// Динамический <title>: подставляем название текущего города (если выбран).
+// Шаблон в app/layout.js обернёт в "<город> — Погода".
+export async function generateMetadata({ searchParams }) {
+  const sp = await searchParams;
+  const parsed = parseParams(sp);
+  const name = parsed.location?.name;
+  return name ? { title: name } : {};
+}
 
 export default async function Page({ searchParams }) {
   const sp = await searchParams;
@@ -45,7 +55,7 @@ export default async function Page({ searchParams }) {
           endDate={parsed.endDate}
         />
       ) : (
-        <EmptyState />
+        <LocationBootstrap />
       )}
 
       <footer className="mt-12 pt-6 border-t border-stroke text-xs text-fg-muted text-center">
@@ -84,18 +94,6 @@ async function WeatherSection({ location, startDate, endDate }) {
       startDate={startDate}
       endDate={endDate}
     />
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="rounded-2xl bg-surface border border-stroke backdrop-blur-xl p-10 text-center">
-      <div className="text-6xl mb-4" aria-hidden>🌍</div>
-      <div className="text-xl text-fg-soft mb-2">Выберите место</div>
-      <div className="text-sm text-fg-muted max-w-sm mx-auto">
-        Начните вводить название города или нажмите «Моё место», чтобы использовать вашу геолокацию.
-      </div>
-    </div>
   );
 }
 
