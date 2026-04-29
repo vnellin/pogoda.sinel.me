@@ -1,65 +1,154 @@
-import Image from "next/image";
+import { Suspense } from "react";
+import { LocationPicker } from "./components/LocationPicker";
+import { DateRangePicker } from "./components/DateRangePicker";
+import { WeatherDisplay } from "./components/WeatherDisplay";
+import { getWeather } from "@/lib/weather-service";
 
-export default function Home() {
+const MIN_DATE = "1979-01-01";
+const MAX_FORECAST_DAYS = 4;
+
+export default async function Page({ searchParams }) {
+  const sp = await searchParams;
+  const parsed = parseParams(sp);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
+    <main className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
+      <header className="mb-8 sm:mb-10">
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl sm:text-5xl font-light tracking-tight">
+            <span className="bg-gradient-to-r from-sky-600 via-indigo-600 to-purple-600 dark:from-sky-300 dark:via-indigo-300 dark:to-purple-300 bg-clip-text text-transparent">
+              Погода
+            </span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+          <span className="text-xs text-fg-muted mt-2 hidden sm:inline">
+            архив с 1979 года и прогноз
+          </span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </header>
+
+      <section className="mb-8 space-y-4">
+        <Suspense fallback={<PickerSkeleton />}>
+          <LocationPicker current={parsed.location} />
+        </Suspense>
+
+        {parsed.location && (
+          <Suspense fallback={null}>
+            <DateRangePicker start={parsed.startDate} end={parsed.endDate} />
+          </Suspense>
+        )}
+      </section>
+
+      {parsed.location ? (
+        <WeatherSection
+          location={parsed.location}
+          startDate={parsed.startDate}
+          endDate={parsed.endDate}
+        />
+      ) : (
+        <EmptyState />
+      )}
+
+      <footer className="mt-12 pt-6 border-t border-stroke text-xs text-fg-muted text-center">
+        Данные{" "}
+        <a
+          href="https://open-meteo.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-fg-soft"
+        >
+          Open-Meteo
+        </a>{" "}
+        — архив ERA5 и прогнозы Open-Meteo
+      </footer>
+    </main>
+  );
+}
+
+async function WeatherSection({ location, startDate, endDate }) {
+  let result;
+  try {
+    result = await getWeather({ location, startDate, endDate });
+  } catch (err) {
+    return (
+      <div className="rounded-2xl bg-rose-500/10 border border-rose-400/30 p-6 text-accent-hot">
+        <div className="font-medium mb-1">Не удалось загрузить погоду</div>
+        <div className="text-sm opacity-80">{String(err?.message ?? err)}</div>
+      </div>
+    );
+  }
+
+  return (
+    <WeatherDisplay
+      hours={result.hours}
+      location={result.location}
+      startDate={startDate}
+      endDate={endDate}
+    />
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="rounded-2xl bg-surface border border-stroke backdrop-blur-xl p-10 text-center">
+      <div className="text-6xl mb-4" aria-hidden>🌍</div>
+      <div className="text-xl text-fg-soft mb-2">Выберите место</div>
+      <div className="text-sm text-fg-muted max-w-sm mx-auto">
+        Начните вводить название города или нажмите «Моё место», чтобы использовать вашу геолокацию.
+      </div>
     </div>
   );
+}
+
+function PickerSkeleton() {
+  return <div className="h-12 rounded-xl bg-surface border border-stroke animate-pulse" />;
+}
+
+// --- разбор параметров ---
+
+function parseParams(sp) {
+  const lat = parseFloat(sp.lat);
+  const lon = parseFloat(sp.lon);
+  const hasLocation = Number.isFinite(lat) && Number.isFinite(lon);
+
+  const today = todayISO();
+  // По умолчанию показываем сегодня + весь доступный прогноз вперёд (today..today+MAX_FORECAST_DAYS)
+  const defaultEnd = isoMax(today);
+  const startRaw = typeof sp.start === "string" ? sp.start : today;
+  const endRaw = typeof sp.end === "string" ? sp.end : defaultEnd;
+
+  const startDate = clampDate(startRaw, today);
+  const endDate = clampDate(endRaw, today);
+
+  return {
+    location: hasLocation
+      ? {
+          latitude: lat,
+          longitude: lon,
+          name: typeof sp.name === "string" ? sp.name : null,
+          country: typeof sp.country === "string" ? sp.country : null,
+          admin1: typeof sp.admin1 === "string" ? sp.admin1 : null,
+          timezone: typeof sp.tz === "string" ? sp.tz : null,
+        }
+      : null,
+    startDate,
+    endDate,
+  };
+}
+
+function clampDate(value, today) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return today;
+  const max = isoMax(today);
+  if (value < MIN_DATE) return MIN_DATE;
+  if (value > max) return max;
+  return value;
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function isoMax(today) {
+  const d = new Date(`${today}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + MAX_FORECAST_DAYS);
+  return d.toISOString().slice(0, 10);
 }

@@ -1,0 +1,76 @@
+// Схема БД проекта pogoda
+// Источник данных: Open-Meteo (архив ERA5 + прогноз)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  // url и shadowDatabaseUrl задаются в prisma.config.mjs (требование Prisma 7)
+}
+
+// Геолокация. Уникальна по паре (latitude, longitude).
+// Координаты храним такими, какими их вернул Open-Meteo (привязка к сетке),
+// чтобы повторные запросы к одной точке не плодили дубли.
+model Location {
+  id        Int      @id @default(autoincrement())
+  latitude  Decimal  @db.Decimal(7, 4)
+  longitude Decimal  @db.Decimal(7, 4)
+
+  // отображаемое имя из geocoding API (для UI)
+  name      String?  @db.VarChar(255)
+  country   String?  @db.VarChar(8)
+  admin1    String?  @db.VarChar(255)
+  timezone  String?  @db.VarChar(64)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  hourly    HourlyWeather[]
+
+  @@unique([latitude, longitude])
+  @@map("locations")
+}
+
+// Почасовые данные — и архив, и прогноз в одной таблице.
+// Уникальность по (locationId, timestamp): на одну точку и час — одна запись.
+// При повторном запросе делаем upsert: forecast может быть перезаписан archive,
+// либо более свежим прогнозом (см. fetchedAt + source).
+model HourlyWeather {
+  id         BigInt   @id @default(autoincrement())
+  locationId Int      @map("location_id")
+
+  // момент времени в UTC (Open-Meteo всегда отдаёт UTC при utc_offset_seconds=0)
+  timestamp  DateTime @db.DateTime(0)
+
+  // 'archive' — ERA5 (статичен), 'forecast' — прогнозная модель (устаревает)
+  source     WeatherSource
+
+  // когда мы сохранили запись (для протухания прогнозов)
+  fetchedAt  DateTime @default(now()) @map("fetched_at")
+
+  // Погодные параметры (все nullable — Open-Meteo может пропустить поле)
+  temperature2m       Float? @map("temperature_2m")        // °C
+  apparentTemperature Float? @map("apparent_temperature")  // °C, ощущаемая
+  relativeHumidity2m  Int?   @map("relative_humidity_2m")  // %
+  precipitation       Float? @map("precipitation")         // мм/ч (всё вместе)
+  rain                Float? @map("rain")                  // мм/ч
+  snowfall            Float? @map("snowfall")              // см/ч
+  pressureMsl         Float? @map("pressure_msl")          // гПа
+  cloudCover          Int?   @map("cloud_cover")           // %
+  windSpeed10m        Float? @map("wind_speed_10m")        // км/ч
+  windDirection10m    Int?   @map("wind_direction_10m")    // °
+  windGusts10m        Float? @map("wind_gusts_10m")        // км/ч
+  weatherCode         Int?   @map("weather_code")          // WMO code
+
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, timestamp])
+  @@index([timestamp])
+  @@map("hourly_weather")
+}
+
+enum WeatherSource {
+  archive
+  forecast
+}

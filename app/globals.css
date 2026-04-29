@@ -1,26 +1,111 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* class-based dark variant: html.dark включает тёмную тему */
+@custom-variant dark (&:where(.dark, .dark *));
 
+/* Семантические токены — берут значения из CSS-vars, которые меняются по теме.
+   Tailwind 4 автоматически генерирует утилиты bg-bg, text-fg, border-stroke и т.д. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+
+  --color-bg: var(--bg);
+  --color-bg-deep: var(--bg-deep);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-stroke: var(--stroke);
+  --color-stroke-strong: var(--stroke-strong);
+
+  --color-fg: var(--fg);
+  --color-fg-strong: var(--fg-strong);
+  --color-fg-soft: var(--fg-soft);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-faint: var(--fg-faint);
+
+  --color-accent-hot: var(--accent-hot);
+  --color-accent-cold: var(--accent-cold);
+
+  --color-aura-1: var(--aura-1);
+  --color-aura-2: var(--aura-2);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* --- LIGHT (по умолчанию) --- */
+:root {
+  --bg: oklch(0.985 0.003 240);          /* почти белый с холодным оттенком */
+  --bg-deep: white;
+  --surface: oklch(0 0 0 / 0.04);
+  --surface-strong: oklch(0 0 0 / 0.08);
+  --stroke: oklch(0 0 0 / 0.10);
+  --stroke-strong: oklch(0 0 0 / 0.18);
+
+  --fg: oklch(0.20 0.02 264);            /* slate-900 */
+  --fg-strong: oklch(0.10 0.02 264);     /* почти чёрный */
+  --fg-soft: oklch(0.40 0.02 264);       /* slate-700 */
+  --fg-muted: oklch(0.55 0.02 264);      /* slate-500 */
+  --fg-faint: oklch(0.70 0.02 264);      /* slate-400 */
+
+  --accent-hot: oklch(0.55 0.20 25);     /* rose-700 */
+  --accent-cold: oklch(0.55 0.18 245);   /* sky-700 */
+
+  --aura-1: oklch(0.78 0.16 245 / 0.25); /* sky */
+  --aura-2: oklch(0.65 0.20 290 / 0.18); /* indigo */
+}
+
+/* --- DARK --- */
+.dark {
+  --bg: oklch(0.10 0.02 264);            /* slate-950 */
+  --bg-deep: black;
+  --surface: oklch(1 0 0 / 0.05);
+  --surface-strong: oklch(1 0 0 / 0.10);
+  --stroke: oklch(1 0 0 / 0.10);
+  --stroke-strong: oklch(1 0 0 / 0.20);
+
+  --fg: oklch(0.95 0 0);                 /* slate-100 */
+  --fg-strong: white;
+  --fg-soft: oklch(0.85 0.02 264);       /* slate-200 */
+  --fg-muted: oklch(0.65 0.02 264);      /* slate-400 */
+  --fg-faint: oklch(0.45 0.02 264);      /* slate-500 */
+
+  --accent-hot: oklch(0.78 0.18 25);     /* rose-300 */
+  --accent-cold: oklch(0.78 0.16 245);   /* sky-300 */
+
+  --aura-1: oklch(0.55 0.18 245 / 0.20); /* sky-500 */
+  --aura-2: oklch(0.45 0.20 290 / 0.20); /* indigo-600 */
+}
+
+html, body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* Системная тема: если пользователь не выбирал — следуем prefers-color-scheme.
+   Скрипт в layout.js навешивает .dark или .light на html, поэтому этот блок
+   срабатывает только когда класс не задан явно (initial render до hydration). */
+@media (prefers-color-scheme: dark) {
+  html:not(.light):not(.dark) {
+    --bg: oklch(0.10 0.02 264);
+    --bg-deep: black;
+    --surface: oklch(1 0 0 / 0.05);
+    --surface-strong: oklch(1 0 0 / 0.10);
+    --stroke: oklch(1 0 0 / 0.10);
+    --stroke-strong: oklch(1 0 0 / 0.20);
+    --fg: oklch(0.95 0 0);
+    --fg-strong: white;
+    --fg-soft: oklch(0.85 0.02 264);
+    --fg-muted: oklch(0.65 0.02 264);
+    --fg-faint: oklch(0.45 0.02 264);
+    --accent-hot: oklch(0.78 0.18 25);
+    --accent-cold: oklch(0.78 0.16 245);
+    --aura-1: oklch(0.55 0.18 245 / 0.20);
+    --aura-2: oklch(0.45 0.20 290 / 0.20);
+  }
+}
+
+/* Стрелка нативного date-инпута: инвертируем в тёмной теме */
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="number"] {
+  color-scheme: dark;
 }
