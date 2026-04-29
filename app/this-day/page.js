@@ -140,7 +140,8 @@ function parseParams(sp) {
   const toYear = clampInt(parseInt(sp.to, 10), MIN_YEAR, currentYear, currentYear);
 
   const sort = VALID_SORTS.has(sp.sort) ? sp.sort : "year";
-  const dir = VALID_DIRS.has(sp.dir) ? sp.dir : "asc";
+  // По умолчанию — от новых годов к старым
+  const dir = VALID_DIRS.has(sp.dir) ? sp.dir : "desc";
 
   // Сериализуем актуальные параметры для построения href в заголовках таблицы
   const search = new URLSearchParams();

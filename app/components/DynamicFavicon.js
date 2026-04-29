@@ -2,8 +2,10 @@
 
 import { useEffect } from "react";
 
-// Динамическая favicon: SVG с emoji в data-URL. Браузеры предпочитают SVG-icon
-// перед /favicon.ico, поэтому достаточно вставить <link rel="icon" type="image/svg+xml">.
+// Динамическая favicon: SVG с emoji в data-URL. Browser-ы выбирают «последнюю
+// подходящую» <link rel="icon">, поэтому вставляем свою с data-dynamic=1.
+// При размонтировании компонента (например, выбор «нет локации») удаляем —
+// браузер вернётся к дефолтной /icon.svg от Next.js.
 export function DynamicFavicon({ emoji }) {
   useEffect(() => {
     if (!emoji) return;
@@ -23,6 +25,11 @@ export function DynamicFavicon({ emoji }) {
       document.head.appendChild(link);
     }
     link.href = href;
+
+    return () => {
+      const existing = document.querySelector("link[rel='icon'][data-dynamic='1']");
+      if (existing) existing.remove();
+    };
   }, [emoji]);
 
   return null;

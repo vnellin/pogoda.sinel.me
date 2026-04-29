@@ -51,7 +51,13 @@ function Hero({ overall, location, dateLabel }) {
         <div>
           <div className="text-sm uppercase tracking-widest text-fg-muted mb-1">{dateLabel}</div>
           <div className="text-xs text-fg-muted">
-            {overall.yearsCount} лет · {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+            {overall.firstYear}–{overall.lastYear}{" "}
+            ({overall.lastYear - overall.firstYear}{" "}
+            {pluralRu(overall.lastYear - overall.firstYear, ["год", "года", "лет"])},{" "}
+            {overall.yearsCount}{" "}
+            {pluralRu(overall.yearsCount, ["наблюдение", "наблюдения", "наблюдений"])})
+            {" · "}
+            {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
           </div>
         </div>
       </div>
@@ -378,10 +384,14 @@ function computeOverall(stats) {
   let hottest = stats[0];
   let coldest = stats[0];
   let wettest = stats[0];
+  let firstYear = stats[0].year;
+  let lastYear = stats[0].year;
   for (const s of stats) {
     if (s.maxTemp > hottest.maxTemp) hottest = s;
     if (s.minTemp < coldest.minTemp) coldest = s;
     if (s.totalPrecip > wettest.totalPrecip) wettest = s;
+    if (s.year < firstYear) firstYear = s.year;
+    if (s.year > lastYear) lastYear = s.year;
   }
 
   // Доминирующий weather-code за все годы суммарно
@@ -390,6 +400,8 @@ function computeOverall(stats) {
 
   return {
     yearsCount,
+    firstYear,
+    lastYear,
     meanMax,
     meanMin,
     hottestYear: hottest.year,
@@ -400,6 +412,16 @@ function computeOverall(stats) {
     wettestPrecip: wettest.totalPrecip,
     dominantCode: dom,
   };
+}
+
+// Русский плюрал. forms = [одно, два, пять]
+function pluralRu(n, [one, few, many]) {
+  const m100 = n % 100;
+  if (m100 >= 11 && m100 <= 14) return many;
+  const m10 = n % 10;
+  if (m10 === 1) return one;
+  if (m10 >= 2 && m10 <= 4) return few;
+  return many;
 }
 
 function formatTemp(v) {

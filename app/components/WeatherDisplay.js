@@ -1,8 +1,7 @@
 // Server Component (без 'use client'): получает уже загруженные часы и рисует UI.
 import { weatherInfo, dominantCode } from "@/lib/weather-codes";
 import { DynamicFavicon } from "./DynamicFavicon";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { TemperatureChartClient } from "./TemperatureChartClient";
 
 export function WeatherDisplay({ hours, location, startDate, endDate }) {
   if (hours.length === 0) {
@@ -22,7 +21,7 @@ export function WeatherDisplay({ hours, location, startDate, endDate }) {
     <div className="space-y-6">
       <DynamicFavicon emoji={snapshotInfo.emoji} />
       <HeroCard hour={snapshot} location={location} startDate={startDate} endDate={endDate} />
-      <TemperatureChart hours={hours} />
+      <TemperatureChartClient hours={hours} />
       {isMultiDay && <DailyCards days={days} />}
     </div>
   );
@@ -76,7 +75,7 @@ function HeroCard({ hour, location, startDate, endDate }) {
 
       <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <Stat label="Влажность" value={hour.relativeHumidity2m != null ? `${hour.relativeHumidity2m}%` : "—"} />
-        <Stat label="Давление" value={hour.pressureMsl != null ? `${Math.round(hour.pressureMsl)} гПа` : "—"} />
+        <Stat label="Давление" value={formatPressure(hour.pressureMsl)} />
         <Stat
           label="Ветер"
           value={
@@ -106,121 +105,68 @@ function Stat({ label, value, hint }) {
   );
 }
 
-// --- Temperature chart (SVG) ---
-
-function TemperatureChart({ hours }) {
-  // Если диапазон длинный — агрегируем по дням, иначе показываем все часы
-  const points = hours.length > 168 ? aggregatePointsByDay(hours) : hours.map(hourPoint);
-  if (points.length < 2) return null;
-
-  const width = 1000;
-  const height = 240;
-  const padding = { top: 20, right: 20, bottom: 28, left: 40 };
-  const innerW = width - padding.left - padding.right;
-  const innerH = height - padding.top - padding.bottom;
-
-  const temps = points.map((p) => p.value).filter((v) => v != null);
-  if (temps.length === 0) return null;
-  const minT = Math.min(...temps);
-  const maxT = Math.max(...temps);
-  const range = Math.max(maxT - minT, 1);
-
-  const xs = (i) => padding.left + (i / (points.length - 1)) * innerW;
-  const ys = (v) => padding.top + (1 - (v - minT) / range) * innerH;
-
-  // Линия и заливка под ней
-  const linePath = points
-    .map((p, i) => `${i === 0 ? "M" : "L"} ${xs(i).toFixed(2)} ${ys(p.value).toFixed(2)}`)
-    .join(" ");
-  const areaPath =
-    `M ${xs(0).toFixed(2)} ${(padding.top + innerH).toFixed(2)} ` +
-    points.map((p, i) => `L ${xs(i).toFixed(2)} ${ys(p.value).toFixed(2)}`).join(" ") +
-    ` L ${xs(points.length - 1).toFixed(2)} ${(padding.top + innerH).toFixed(2)} Z`;
-
-  // 4 горизонтальные линии-оси
-  const ticks = 4;
-  const tickValues = Array.from({ length: ticks + 1 }, (_, i) => minT + (range * i) / ticks);
-
-  // Несколько меток оси X
-  const labelEvery = Math.max(1, Math.floor(points.length / 6));
-
-  return (
-    <div className="rounded-2xl bg-surface border border-stroke backdrop-blur-xl p-4 sm:p-6">
-      <div className="text-sm text-fg-muted mb-3">
-        Температура {points.length > 168 ? "(средняя по дням)" : "(почасовая)"}
-      </div>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="w-full h-auto"
-        preserveAspectRatio="none"
-        role="img"
-        aria-label="График температуры"
-      >
-        <defs>
-          <linearGradient id="tempArea" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgb(56 189 248)" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="rgb(56 189 248)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
-        {/* Сетка */}
-        {tickValues.map((t, i) => {
-          const y = padding.top + (1 - (t - minT) / range) * innerH;
-          return (
-            <g key={i}>
-              <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="rgb(148 163 184 / 0.15)" strokeWidth="1" />
-              <text x={padding.left - 8} y={y + 4} fontSize="11" fill="rgb(148 163 184)" textAnchor="end">
-                {Math.round(t)}°
-              </text>
-            </g>
-          );
-        })}
-
-        {/* Заливка */}
-        <path d={areaPath} fill="url(#tempArea)" />
-        {/* Линия */}
-        <path d={linePath} fill="none" stroke="rgb(56 189 248)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-
-        {/* Метки оси X */}
-        {points.map((p, i) =>
-          i % labelEvery === 0 || i === points.length - 1 ? (
-            <text key={i} x={xs(i)} y={height - 8} fontSize="11" fill="rgb(148 163 184)" textAnchor="middle">
-              {p.xLabel}
-            </text>
-          ) : null,
-        )}
-      </svg>
-    </div>
-  );
-}
-
-// --- Daily cards ---
+// --- Daily table ---
 
 function DailyCards({ days }) {
+  const today = new Date().toISOString().slice(0, 10);
+  // Новые даты сверху
+  const ordered = days.slice().reverse();
   return (
-    <div>
-      <div className="text-sm text-fg-muted mb-3">По дням</div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {days.map((d) => {
-          const info = weatherInfo(d.dominantCode);
-          return (
-            <div
-              key={d.dateKey}
-              className="rounded-xl bg-surface border border-stroke backdrop-blur p-4 hover:bg-surface-strong transition"
-            >
-              <div className="text-xs text-fg-muted">{formatShortDate(d.dateKey)}</div>
-              <div className="text-3xl my-1" aria-hidden>{info.emoji}</div>
-              <div className="text-sm text-fg-soft">{info.label}</div>
-              <div className="mt-2 flex items-baseline gap-2 tabular-nums">
-                <span className="text-lg">{formatTemp(d.maxTemp)}</span>
-                <span className="text-sm text-fg-muted">/ {formatTemp(d.minTemp)}</span>
-              </div>
-              {d.totalPrecip > 0 && (
-                <div className="mt-1 text-xs text-accent-cold">💧 {d.totalPrecip.toFixed(1)} мм</div>
-              )}
-            </div>
-          );
-        })}
+    <div className="rounded-2xl bg-surface border border-stroke backdrop-blur-xl overflow-hidden">
+      <div className="px-4 sm:px-6 py-4 border-b border-stroke">
+        <div className="text-sm text-fg-muted">По дням</div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs uppercase tracking-wider text-fg-muted bg-surface border-b border-stroke">
+              <th className="px-3 sm:px-4 py-3 font-medium text-left">Дата</th>
+              <th className="px-3 sm:px-4 py-3 font-medium text-left">Погода</th>
+              <th className="px-3 sm:px-4 py-3 font-medium text-right">Макс</th>
+              <th className="px-3 sm:px-4 py-3 font-medium text-right">Мин</th>
+              <th className="px-3 sm:px-4 py-3 font-medium text-right">Сред</th>
+              <th className="px-3 sm:px-4 py-3 font-medium text-right">Осадки</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ordered.map((d) => {
+              const info = weatherInfo(d.dominantCode);
+              const isToday = d.dateKey === today;
+              return (
+                <tr
+                  key={d.dateKey}
+                  className={`border-b border-stroke last:border-b-0 transition hover:bg-surface
+                              ${isToday ? "bg-sky-500/5" : ""}`}
+                >
+                  <td className="px-3 sm:px-4 py-3">
+                    <div className="text-base">{formatShortDate(d.dateKey)}</div>
+                    {isToday && <div className="text-[10px] text-accent-cold uppercase tracking-wider">сегодня</div>}
+                  </td>
+                  <td className="px-3 sm:px-4 py-3">
+                    <span className="text-xl mr-2" aria-hidden>{info.emoji}</span>
+                    <span className="text-fg-soft">{info.label}</span>
+                  </td>
+                  <td className="px-3 sm:px-4 py-3 text-right tabular-nums text-accent-hot">
+                    {formatTemp(d.maxTemp)}
+                  </td>
+                  <td className="px-3 sm:px-4 py-3 text-right tabular-nums text-accent-cold">
+                    {formatTemp(d.minTemp)}
+                  </td>
+                  <td className="px-3 sm:px-4 py-3 text-right tabular-nums text-fg-soft">
+                    {formatTemp(d.meanTemp)}
+                  </td>
+                  <td className="px-3 sm:px-4 py-3 text-right tabular-nums">
+                    {d.totalPrecip > 0 ? (
+                      <span className="text-sky-400/80">{d.totalPrecip.toFixed(1)} мм</span>
+                    ) : (
+                      <span className="text-fg-faint">—</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -252,45 +198,31 @@ function groupByDay(hours) {
   }
   return Array.from(groups.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([dateKey, items]) => ({
-      dateKey,
-      items,
-      minTemp: Math.min(...items.map((h) => h.temperature2m).filter((v) => v != null)),
-      maxTemp: Math.max(...items.map((h) => h.temperature2m).filter((v) => v != null)),
-      totalPrecip: items.reduce((s, h) => s + (h.precipitation ?? 0), 0),
-      dominantCode: dominantCode(items.map((h) => h.weatherCode)),
-    }));
-}
-
-function hourPoint(h) {
-  const d = new Date(h.timestamp);
-  return {
-    value: h.temperature2m,
-    xLabel: `${String(d.getUTCHours()).padStart(2, "0")}:00`,
-    timestamp: h.timestamp,
-  };
-}
-
-function aggregatePointsByDay(hours) {
-  const groups = new Map();
-  for (const h of hours) {
-    const key = h.timestamp.slice(0, 10);
-    if (!groups.has(key)) groups.set(key, []);
-    if (h.temperature2m != null) groups.get(key).push(h.temperature2m);
-  }
-  return Array.from(groups.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([dateKey, temps]) => ({
-      value: temps.length > 0 ? temps.reduce((s, v) => s + v, 0) / temps.length : null,
-      xLabel: formatShortDate(dateKey),
-      timestamp: dateKey,
-    }));
+    .map(([dateKey, items]) => {
+      const temps = items.map((h) => h.temperature2m).filter((v) => v != null);
+      return {
+        dateKey,
+        items,
+        minTemp: temps.length ? Math.min(...temps) : null,
+        maxTemp: temps.length ? Math.max(...temps) : null,
+        meanTemp: temps.length ? temps.reduce((s, v) => s + v, 0) / temps.length : null,
+        totalPrecip: items.reduce((s, h) => s + (h.precipitation ?? 0), 0),
+        dominantCode: dominantCode(items.map((h) => h.weatherCode)),
+      };
+    });
 }
 
 function formatTemp(v) {
   if (v == null) return "—";
   const rounded = Math.round(v);
   return `${rounded > 0 ? "+" : ""}${rounded}°`;
+}
+
+// Open-Meteo отдаёт давление в гПа. Норма ~1013 гПа = 760 мм рт. ст.
+// 1 гПа = 0.750062 мм рт. ст.
+function formatPressure(hPa) {
+  if (hPa == null) return "—";
+  return `${Math.round(hPa * 0.750062)} мм рт. ст.`;
 }
 
 function precipHint(h) {
