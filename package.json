@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "deploy": "./build-and-deploy.sh"
   },
   "dependencies": {
     "@prisma/adapter-mariadb": "^7.8.0",

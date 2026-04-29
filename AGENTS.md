@@ -26,7 +26,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 вывод на экран показывать максимально круто с точки зрения дизайна, использовать все возможные красивые фишки
 
 ## Принятые решения
-- БД: MySQL на `sky.sinel.me`, база `pogoda`, пользователь `pogoda` (права только на свою базу + shadow для миграций)
+- БД: MySQL, база `pogoda`, пользователь `pogoda` (права только на свою базу + shadow для миграций). Подключение — через `DATABASE_URL` из `.env`
 - ORM: Prisma
 - Источник данных: **Open-Meteo** (бесплатно, без ключа для некоммерческого использования)
   - архив ERA5: `https://archive-api.open-meteo.com/v1/archive` — почасовые данные с 1940 г., задержка ~5 дней
